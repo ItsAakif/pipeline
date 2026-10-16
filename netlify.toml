@@ -1,0 +1,13 @@
+[build]
+  base = "pipeline-frontend"
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# Single-page app: serve index.html for unknown paths.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

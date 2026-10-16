@@ -1,0 +1,56 @@
+[package]
+name = "pipeline-backend"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Web server
+actix-web = "4.4"
+actix-cors = "0.7"
+actix-ws = "0.3"
+tokio = { version = "1.35", features = ["full"] }
+actix = "0.13"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_with = "3.0"
+
+# Async utilities
+futures = "0.3"
+
+# Compilation and binary analysis (cross-platform)
+iced-x86 = "1.21"
+goblin = "0.8"
+object = "0.32"
+
+# Caching
+lru = "0.12"
+dashmap = "5.5"
+
+# Hashing
+sha2 = "0.10"
+hex = "0.4"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Logging
+env_logger = "0.11"
+log = "0.4"
+
+# Utilities
+base64 = "0.22"
+chrono = "0.4"
+regex = "1.10"
+
+# Unix-only dependencies (compilation, sandboxing)
+[target.'cfg(unix)'.dependencies]
+clang-sys = "1.7"
+nix = { version = "0.27", features = ["resource", "process", "signal"] }
+landlock = "0.4"
+
+# Dev dependencies
+[dev-dependencies]
+tokio-test = "0.4"

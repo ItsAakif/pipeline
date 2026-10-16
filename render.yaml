@@ -1,0 +1,23 @@
+# Render Blueprint (https://render.com/docs/blueprint-spec)
+#
+# Targets Render's FREE web-service tier. Render builds the repo-root Dockerfile
+# and injects a PORT env var; the backend binds 0.0.0.0:$PORT automatically when
+# BIND_ADDRESS is unset. Health checks use /api/health.
+#
+# Deploy: Render dashboard -> New -> Blueprint -> connect this repository.
+services:
+  - type: web
+    name: pipeline
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    envVars:
+      # 512 MB free instance => force the smallest profile (1 worker,
+      # 1 concurrent compile) so at most one clang runs at a time.
+      - key: LOW_MEMORY
+        value: "1"
+      - key: LOG_LEVEL
+        value: info
+      # Do NOT set PORT (Render injects it) or FRONTEND_DIR (the Dockerfile sets
+      # it to /app/frontend for the single-container deploy).

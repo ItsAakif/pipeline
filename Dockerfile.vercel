@@ -1,0 +1,104 @@
+# Vercel Container Runtime image (Fluid compute Function).
+#
+# Vercel builds a root-level `Dockerfile.vercel` as a container Function. The
+# container MUST listen on port 80 by default and bind 0.0.0.0; Vercel respects
+# the image ENTRYPOINT. The app reads `BIND_ADDRESS` first, then `PORT` (set to
+# 80 here, overridable from the Vercel project settings), then 0.0.0.0:8080 --
+# so this image binds 0.0.0.0:80 (or Vercel's injected PORT) without any code
+# change.
+#
+# This mirrors the root `Dockerfile`; the runtime stage differs only in the
+# packages, the privileged-port capability, and the port/entrypoint settings.
+
+# Stage 1: Build Rust backend
+FROM rust:latest AS backend-builder
+
+WORKDIR /app
+
+# Install system dependencies
+RUN apt-get update && apt-get install -y \
+    clang \
+    libclang-dev \
+    binutils \
+    pkg-config \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy backend source
+COPY pipeline-backend/ ./backend/
+WORKDIR /app/backend
+
+# Build backend
+RUN cargo build --release
+
+# Stage 2: Build Solid.js frontend
+FROM node:20-slim AS frontend-builder
+
+WORKDIR /app
+
+# Copy frontend source
+COPY pipeline-frontend/ ./frontend/
+WORKDIR /app/frontend
+
+# Install dependencies
+RUN npm ci
+
+# Build frontend
+RUN npm run build
+
+# Stage 3: Final runtime image
+FROM debian:trixie-slim
+
+# Runtime dependencies (+ libcap2-bin for `setcap`).
+RUN apt-get update && apt-get install -y \
+    clang \
+    binutils \
+    libssl3 \
+    ca-certificates \
+    curl \
+    libcap2-bin \
+    tini \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create app user
+RUN useradd -m -u 1000 pipeline
+
+WORKDIR /app
+
+# Copy from builder stages
+COPY --from=backend-builder /app/backend/target/release/pipeline-backend ./pipeline-backend
+COPY --from=frontend-builder /app/frontend/dist ./frontend
+
+# Set permissions (chown before setcap: changing ownership can clear caps)
+RUN chown -R pipeline:pipeline /app
+
+# Let the non-root user bind privileged port 80.
+RUN setcap cap_net_bind_service=+ep /app/pipeline-backend
+
+# Switch to non-root user
+USER pipeline
+
+# Vercel expects the container to listen on port 80 by default.
+EXPOSE 80
+
+# Environment variables
+ENV PORT=80
+ENV LOG_LEVEL=info
+# Serve the built SPA from the image (single-container deploy).
+ENV FRONTEND_DIR=/app/frontend
+# WORKERS and MAX_CONCURRENT_COMPILES are intentionally NOT set: the backend
+# adapts them to the detected memory limit.
+ENV RATE_LIMIT_PER_MINUTE=30
+ENV MAX_AST_BYTES=2097152
+
+# Health check on the port Vercel routes to.
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:80/api/health || exit 1
+
+# Run the backend under tini as PID 1 (Vercel respects ENTRYPOINT).
+#
+# The server is PID 1 in the container; without an init, children reparented
+# after a process-group kill linger as zombies and exhaust the PID budget.
+# tini reaps them.
+ENTRYPOINT ["/usr/bin/tini", "--"]
+CMD ["./pipeline-backend"]

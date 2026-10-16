@@ -1,0 +1,39 @@
+# Keep the Docker build context small (hosting hardening R10).
+# Everything below is (re)built inside the image or is irrelevant at runtime.
+
+# Build artifacts
+target/
+**/target/
+dist/
+**/dist/
+build/
+**/build/
+
+# Dependency trees
+node_modules/
+**/node_modules/
+
+# VCS / plans / docs
+.git/
+.gitignore
+.planning/
+*.md
+
+# Local env & secrets
+.env
+.env.*
+*.pem
+
+# Logs / temp
+*.log
+logs/
+tmp/
+temp/
+run_out.txt
+run_err.txt
+
+# Editor / OS noise
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
